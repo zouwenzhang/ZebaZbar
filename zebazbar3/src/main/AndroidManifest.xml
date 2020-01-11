@@ -1,0 +1,5 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.zeba.im.zebazbar3" >
+    <application></application>
+    <uses-permission android:name="android.permission.CAMERA"/>
+</manifest>
