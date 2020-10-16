@@ -51,21 +51,19 @@ public class ZebaScanView extends FrameLayout implements SurfaceHolder.Callback 
         super(context, attrs, defStyleAttr);
 
         mCameraManager = new CameraManager(context);
-        mPreviewCallback = new CameraScanAnalysis();
         zBarScanFGView=new ZBarScanFGView(context);
-
-
+        mPreviewCallback = new CameraScanAnalysis(zBarScanFGView);
     }
 
     @Override
     protected void onSizeChanged(int w, int h, int oldw, int oldh) {
         super.onSizeChanged(w, h, oldw, oldh);
         Rect mScanRect = new Rect();
-        int w1 = w / 3 * 2;
+        int w1 = (int)(w*0.8f);
         mScanRect.left = w / 2 - w1 / 2;
         mScanRect.right = mScanRect.left + w1;
-        mScanRect.top = h / 2 - w1 / 2;
-        mScanRect.bottom = mScanRect.top + w1;
+        mScanRect.top = (int)(h*0.15f);
+        mScanRect.bottom = mScanRect.top+(int)(h*0.85f);
         zBarScanFGView.setRect(mScanRect);
     }
 
@@ -155,6 +153,7 @@ public class ZebaScanView extends FrameLayout implements SurfaceHolder.Callback 
     }
 
     private Camera.AutoFocusCallback mFocusCallback = new Camera.AutoFocusCallback() {
+        @Override
         public void onAutoFocus(boolean success, Camera camera) {
             postDelayed(mAutoFocusTask, 500);
         }
@@ -170,6 +169,10 @@ public class ZebaScanView extends FrameLayout implements SurfaceHolder.Callback 
     protected void onDetachedFromWindow() {
         stop();
         super.onDetachedFromWindow();
+    }
+
+    public void takePhoto(TakePhotoListener listener){
+        mPreviewCallback.takePhoto(listener);
     }
 
     public void setFlash() {
@@ -191,4 +194,5 @@ public class ZebaScanView extends FrameLayout implements SurfaceHolder.Callback 
     public boolean isPreviewStart(){
         return this.isPreviewStart;
     }
+
 }

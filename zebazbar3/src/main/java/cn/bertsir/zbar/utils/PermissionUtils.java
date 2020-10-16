@@ -4,14 +4,9 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
-import android.graphics.Color;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
-import android.support.annotation.RequiresApi;
-import android.support.v4.content.ContextCompat;
 import android.util.Log;
 import android.view.MotionEvent;
 import android.view.WindowManager;
@@ -94,9 +89,7 @@ public final class PermissionUtils {
     }
 
     private static boolean isGranted(final String permission) {
-        return Build.VERSION.SDK_INT < Build.VERSION_CODES.M
-                || PackageManager.PERMISSION_GRANTED
-                == ContextCompat.checkSelfPermission(mApp, permission);
+        return true;
     }
 
     /**
@@ -203,32 +196,32 @@ public final class PermissionUtils {
         }
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.M)
     private void startPermissionActivity() {
         mPermissionsDenied = new ArrayList<>();
         mPermissionsDeniedForever = new ArrayList<>();
         PermissionActivity.start(mApp);
     }
 
-    @RequiresApi(api = Build.VERSION_CODES.M)
     private boolean rationale(final Activity activity) {
         boolean isRationale = false;
         if (mOnRationaleListener != null) {
             for (String permission : mPermissionsRequest) {
-                if (activity.shouldShowRequestPermissionRationale(permission)) {
-                    getPermissionsStatus(activity);
-                    mOnRationaleListener.rationale(new OnRationaleListener.ShouldRequest() {
-                        @Override
-                        public void again(boolean again) {
-                            if (again) {
-                                startPermissionActivity();
-                            } else {
-                                requestCallback();
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    if (activity.shouldShowRequestPermissionRationale(permission)) {
+                        getPermissionsStatus(activity);
+                        mOnRationaleListener.rationale(new OnRationaleListener.ShouldRequest() {
+                            @Override
+                            public void again(boolean again) {
+                                if (again) {
+                                    startPermissionActivity();
+                                } else {
+                                    requestCallback();
+                                }
                             }
-                        }
-                    });
-                    isRationale = true;
-                    break;
+                        });
+                        isRationale = true;
+                        break;
+                    }
                 }
             }
             mOnRationaleListener = null;
@@ -242,8 +235,10 @@ public final class PermissionUtils {
                 mPermissionsGranted.add(permission);
             } else {
                 mPermissionsDenied.add(permission);
-                if (!activity.shouldShowRequestPermissionRationale(permission)) {
-                    mPermissionsDeniedForever.add(permission);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    if (!activity.shouldShowRequestPermissionRationale(permission)) {
+                        mPermissionsDeniedForever.add(permission);
+                    }
                 }
             }
         }
@@ -282,7 +277,6 @@ public final class PermissionUtils {
     }
 
 
-    @RequiresApi(api = Build.VERSION_CODES.M)
     public static class PermissionActivity extends Activity {
 
         public static void start(final Context context) {
@@ -292,10 +286,10 @@ public final class PermissionUtils {
         }
 
         @Override
-        protected void onCreate(@Nullable Bundle savedInstanceState) {
+        protected void onCreate(Bundle savedInstanceState) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
                     | WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH);
-            getWindow().setStatusBarColor(Color.TRANSPARENT);
+//            getWindow().setStatusBarColor(Color.TRANSPARENT);
             if (sInstance == null) {
                 super.onCreate(savedInstanceState);
                 Log.e("PermissionUtils", "request permissions failed");
@@ -317,14 +311,16 @@ public final class PermissionUtils {
                     finish();
                     return;
                 }
-                requestPermissions(sInstance.mPermissionsRequest.toArray(new String[size]), 1);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    requestPermissions(sInstance.mPermissionsRequest.toArray(new String[size]), 1);
+                }
             }
         }
 
         @Override
         public void onRequestPermissionsResult(int requestCode,
-                                               @NonNull String[] permissions,
-                                               @NonNull int[] grantResults) {
+                                               String[] permissions,
+                                               int[] grantResults) {
             sInstance.onRequestPermissionsResult(this);
             finish();
         }

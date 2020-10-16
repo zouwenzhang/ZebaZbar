@@ -23,6 +23,9 @@ public class ZBarScanFGView extends View{
 	private long runTime=3500;//动画时间
 	private int bgColor;
 	private int lineColor=-1;
+	private int[] showPoint;
+	private long startShowTime;
+	private int maxRadius;
 	public ZBarScanFGView(Context context) {
 		super(context);
 		init(context);
@@ -38,10 +41,12 @@ public class ZBarScanFGView extends View{
 	private void init(Context context){
 		mPaint=new Paint();
 		paint = new Paint(Paint.ANTI_ALIAS_FLAG);
-		paintWidth=dip2px(context, 3);
+		paintWidth=dip2px(context, 5);
 		paintHeight=dip2px(context, 15);
 		bgColor=Color.parseColor("#40000000");
 		lineColor=Color.parseColor("#ff1616");
+		maxRadius=dip2px(context,10);
+		paint.setColor(lineColor);
 	}
 	public void setRect(Rect rect){
 		mScanRect=rect;
@@ -57,7 +62,7 @@ public class ZBarScanFGView extends View{
 				lineColor,
 				Color.parseColor("#00000000"),};
 		float[] positions=new float[]{0f,0.5f,1f};
-		lg=new LinearGradient(mBarRect.left,mBarRect.top,mBarRect.right,mBarRect.bottom,colors,positions,TileMode.CLAMP); 
+		lg=new LinearGradient(mBarRect.left,mBarRect.top,mBarRect.right,mBarRect.bottom,colors,positions,TileMode.CLAMP);
 		//参数一为渐变起初点坐标x位置，参数二为y轴位置，参数三和四分辨对应渐变终点，最后参数为平铺方式，这里设置为镜像
 		mPaint.setShader(lg);
 		startTime=System.currentTimeMillis();
@@ -70,6 +75,12 @@ public class ZBarScanFGView extends View{
 
 	public void setLineColor(int color){
 		lineColor=color;
+		paint.setColor(color);
+	}
+
+	public void setShowPoint(int[] point){
+		showPoint=point;
+		startShowTime=System.currentTimeMillis();
 	}
 
 	@Override
@@ -78,38 +89,38 @@ public class ZBarScanFGView extends View{
 		if (mScanRect == null) {
 			return;
 		}
-		paint.setStyle(Paint.Style.FILL);
-		paint.setColor(bgColor);
-		canvas.drawRect(0, 0, getMeasuredWidth(), mScanRect.top, paint);
-		canvas.drawRect(0, mScanRect.top, mScanRect.left, mScanRect.bottom + 1,
-				paint);
-		canvas.drawRect(mScanRect.right + 1, mScanRect.top, getMeasuredWidth(),
-				mScanRect.bottom + 1, paint);
-		canvas.drawRect(0, mScanRect.bottom + 1, getMeasuredWidth(),
-				getMeasuredHeight(), paint);
+//		paint.setStyle(Paint.Style.FILL);
+//		paint.setColor(bgColor);
+//		canvas.drawRect(0, 0, getMeasuredWidth(), mScanRect.top, paint);
+//		canvas.drawRect(0, mScanRect.top, mScanRect.left, mScanRect.bottom + 1,
+//				paint);
+//		canvas.drawRect(mScanRect.right + 1, mScanRect.top, getMeasuredWidth(),
+//				mScanRect.bottom + 1, paint);
+//		canvas.drawRect(0, mScanRect.bottom + 1, getMeasuredWidth(),
+//				getMeasuredHeight(), paint);
+//
+//		paint.setColor(lineColor);
 
-		paint.setColor(lineColor);
-
-		// 左上角
-		canvas.drawRect(mScanRect.left, mScanRect.top, mScanRect.left + paintHeight,
-				mScanRect.top + paintWidth, paint);
-		canvas.drawRect(mScanRect.left, mScanRect.top, mScanRect.left + paintWidth,
-				mScanRect.top + paintHeight, paint);
-		// 右上角
-		canvas.drawRect(mScanRect.right - paintHeight, mScanRect.top, mScanRect.right,
-				mScanRect.top + paintWidth, paint);
-		canvas.drawRect(mScanRect.right - paintWidth, mScanRect.top, mScanRect.right+1,
-				mScanRect.top + paintHeight, paint);
-		// 左下角
-		canvas.drawRect(mScanRect.left, mScanRect.bottom - paintHeight,
-				mScanRect.left + paintWidth, mScanRect.bottom+1, paint);
-		canvas.drawRect(mScanRect.left, mScanRect.bottom - paintWidth,
-				mScanRect.left + paintHeight, mScanRect.bottom+1, paint);
-		// 右下角
-		canvas.drawRect(mScanRect.right - paintHeight, mScanRect.bottom - paintWidth,
-				mScanRect.right, mScanRect.bottom+1, paint);
-		canvas.drawRect(mScanRect.right - paintWidth, mScanRect.bottom - paintHeight,
-				mScanRect.right+1, mScanRect.bottom, paint);
+//		// 左上角
+//		canvas.drawRect(mScanRect.left, mScanRect.top, mScanRect.left + paintHeight,
+//				mScanRect.top + paintWidth, paint);
+//		canvas.drawRect(mScanRect.left, mScanRect.top, mScanRect.left + paintWidth,
+//				mScanRect.top + paintHeight, paint);
+//		// 右上角
+//		canvas.drawRect(mScanRect.right - paintHeight, mScanRect.top, mScanRect.right,
+//				mScanRect.top + paintWidth, paint);
+//		canvas.drawRect(mScanRect.right - paintWidth, mScanRect.top, mScanRect.right+1,
+//				mScanRect.top + paintHeight, paint);
+//		// 左下角
+//		canvas.drawRect(mScanRect.left, mScanRect.bottom - paintHeight,
+//				mScanRect.left + paintWidth, mScanRect.bottom+1, paint);
+//		canvas.drawRect(mScanRect.left, mScanRect.bottom - paintWidth,
+//				mScanRect.left + paintHeight, mScanRect.bottom+1, paint);
+//		// 右下角
+//		canvas.drawRect(mScanRect.right - paintHeight, mScanRect.bottom - paintWidth,
+//				mScanRect.right, mScanRect.bottom+1, paint);
+//		canvas.drawRect(mScanRect.right - paintWidth, mScanRect.bottom - paintHeight,
+//				mScanRect.right+1, mScanRect.bottom, paint);
 		
 		long nowt=(System.currentTimeMillis()-startTime)%runTime;
 		int h=(int) (rectHeight*(nowt*1f/runTime));
@@ -117,6 +128,13 @@ public class ZBarScanFGView extends View{
 		canvas.translate(0, h);
 		canvas.drawRect(mBarRect.left, mBarRect.top, mBarRect.right, mBarRect.bottom, mPaint);
 		canvas.restore();
+		if(showPoint!=null){
+			float f=(System.currentTimeMillis()-startShowTime)/150f;
+			if(f>1f){
+				f=1f;
+			}
+			canvas.drawCircle(showPoint[0],showPoint[1],f*maxRadius,paint);
+		}
 		postInvalidate();
 	}
 	public static int dip2px(Context context, float dpValue) {

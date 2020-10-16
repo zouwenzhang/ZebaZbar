@@ -15,14 +15,17 @@
  */
 package cn.bertsir.zbar;
 
+import android.graphics.Bitmap;
 import android.hardware.Camera;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
 import android.text.TextUtils;
+import android.util.Log;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import cn.bertsir.zbar.Qr.Config;
 import cn.bertsir.zbar.Qr.Image;
@@ -30,6 +33,8 @@ import cn.bertsir.zbar.Qr.ImageScanner;
 import cn.bertsir.zbar.Qr.ScanResult;
 import cn.bertsir.zbar.Qr.Symbol;
 import cn.bertsir.zbar.Qr.SymbolSet;
+import cn.bertsir.zbar.utils.CameraUtil;
+import cn.bertsir.zbar.view.ZBarScanFGView;
 
 /**
  */
@@ -38,16 +43,20 @@ class CameraScanAnalysis implements Camera.PreviewCallback {
     private ExecutorService executorService = Executors.newSingleThreadExecutor();
 
     private ImageScanner mImageScanner;
-    private Handler mHandler;
+    private Handler mHandler=new Handler(Looper.getMainLooper());
     private ScanListener mCallback;
+    private TakePhotoListener takePhotoListener;
+    private AtomicBoolean isTakePhoto=new AtomicBoolean(false);
     private static final String TAG = "CameraScanAnalysis";
 
     private boolean allowAnalysis = true;
     private Image barcode;
     private Camera.Size size;
     private long lastResultTime = 0;
+    private ZBarScanFGView fgView;
 
-    CameraScanAnalysis() {
+    CameraScanAnalysis(ZBarScanFGView view) {
+        fgView=view;
         mImageScanner = new ImageScanner();
         mImageScanner.setConfig(0, Config.X_DENSITY, 3);
         mImageScanner.setConfig(0, Config.Y_DENSITY, 3);
@@ -74,12 +83,6 @@ class CameraScanAnalysis implements Camera.PreviewCallback {
 //            mImageScanner.setConfig(Symbol.NONE, Config.Y_DENSITY, 3);
 //        }
 
-        mHandler = new Handler(Looper.getMainLooper()) {
-            @Override
-            public void handleMessage(Message msg) {
-                if (mCallback != null) mCallback.onScanResult((ScanResult) msg.obj);
-            }
-        };
     }
 
     void setScanCallback(ScanListener callback) {
@@ -96,25 +99,49 @@ class CameraScanAnalysis implements Camera.PreviewCallback {
 
     @Override
     public void onPreviewFrame(byte[] data, Camera camera) {
-
+        if(isTakePhoto.get()){
+            isTakePhoto.set(false);
+            takePhoto(data,camera);
+        }
         if (allowAnalysis) {
             allowAnalysis = false;
-
             size = camera.getParameters().getPreviewSize();
             barcode = new Image(size.width, size.height, "Y800");
             barcode.setData(data);
-
             //用于框中的自动拉伸和对识别数据的裁剪
-            int w=(int)(size.height/3f*2);
-            barcode.setCrop(size.width/2-w/2, size.height/2-w/2, w, w);
+//            int w=(int)(size.height/3f*2);
+//            barcode.setCrop(size.width/2-w/2, size.height/2-w/2, w, w);
+//            barcode.setCrop(0,0,size.width,size.height);
             if(Symbol.looperScan  &&  (System.currentTimeMillis() - lastResultTime < Symbol.looperWaitTime)){
                 allowAnalysis = true;
                 return;
             }
-
             executorService.execute(mAnalysisTask);
-
         }
+    }
+
+    public void takePhoto(TakePhotoListener takePhotoListener){
+        this.takePhotoListener=takePhotoListener;
+        isTakePhoto.set(true);
+    }
+
+    private void takePhoto(final byte[] data,final Camera camera){
+        executorService.execute(new Runnable() {
+            @Override
+            public void run() {
+                if(takePhotoListener!=null){
+                    final Bitmap bitmap=CameraUtil.toBitmap(data,camera);
+                    mHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            Camera.Size size = camera.getParameters().getPreviewSize();
+                            takePhotoListener.onResult(data,size.width,size.height, bitmap);
+                            takePhotoListener=null;
+                        }
+                    });
+                }
+            }
+        });
     }
 
     /**
@@ -141,33 +168,47 @@ class CameraScanAnalysis implements Camera.PreviewCallback {
     private Runnable mAnalysisTask = new Runnable() {
         @Override
         public void run() {
-
             int result = mImageScanner.scanImage(barcode);
-
+            if(result==0){
+                allowAnalysis = true;
+                return;
+            }
             String resultStr = null;
             int resultType = -1;
             if (result != 0) {
+                Symbol sy=null;
                 SymbolSet symSet = mImageScanner.getResults();
                 for (Symbol sym : symSet){
                     resultStr = sym.getData();
                     resultType= sym.getType();
+                    sy=sym;
+                    break;
                 }
-
+                if(sy!=null){
+//                    Log.e("zwz","w="+barcode.getWidth()+",h="+barcode.getHeight()+",l="+b[0]+",t="+b[1]+",r="+b[2]+",b="+b[3]);
+                    final int[] dps=sy.getBounds();
+                    mHandler.post(new Runnable() {
+                        @Override
+                        public void run() {
+                            fgView.setShowPoint(dps);
+                        }
+                    });
+                }
             }
-
             if (!TextUtils.isEmpty(resultStr)) {
-                ScanResult scanResult = new ScanResult();
+                final ScanResult scanResult = new ScanResult();
                 scanResult.setContent(resultStr);
                 scanResult.setType(resultType == Symbol.QRCODE ? ScanResult.CODE_QR : ScanResult.CODE_BAR);
-                Message message = mHandler.obtainMessage();
-                message.obj = scanResult;
-                message.sendToTarget();
+                mHandler.postDelayed(new Runnable() {
+                    @Override
+                    public void run() {
+                        mCallback.onScanResult(scanResult);
+                    }
+                },300);
                 lastResultTime = System.currentTimeMillis();
                 if (Symbol.looperScan) {
                     allowAnalysis = true;
                 }
-            } else {
-                allowAnalysis = true;
             }
         }
     };
